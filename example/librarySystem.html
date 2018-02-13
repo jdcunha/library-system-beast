@@ -1,0 +1,96 @@
+<script src="../tinytest.js"></script>
+<script>
+/* librarySystem - when we load the library along with dependency
+ * - don't execute the callback immediately but save the callback as a function to the library 
+ * 
+ * When the library is called via the librarySystem()
+ * - On the first call we run the callback function and copy the return value to the library
+ * - Any subsequent call to the library just returns the value assigned to the library
+ * 
+ * Test case 1: Library system should work when dependencies load in order
+ * Test case 2: Library system should work when dependencies are not loaded in order
+ * Test case 3: Callback function should only run once even if a specific library is called multiple times
+ */
+(function(){
+   var libraryStorage = {};
+
+   function librarySystem(libraryName,dependencyList,callback){
+     if(arguments.length === 1){
+        
+        //return the library saved in the library storage
+        var returnValue = libraryStorage[libraryName];
+        if(typeof returnValue === "function"){
+          libraryStorage[libraryName] = returnValue();
+        }
+        return libraryStorage[libraryName];
+    
+     }else{
+        //Load the callback to be executed when the library is called for 
+        libraryStorage[libraryName] = function(){ 
+           									var loadedDependencyArgumentList = [];
+             								if(dependencyList.length > 0) 
+			  								  loadedDependencyArgumentList = dependencyList.map(function(dependency){ return librarySystem(dependency);})
+		
+            								return callback.apply(null,loadedDependencyArgumentList); 
+            						  };
+        
+     }
+   }
+   
+    window.librarySystem = librarySystem;
+})();
+
+tests({
+  'Library system should work when dependencies load in order: ':function(){
+	
+		librarySystem('dependency', [], function() {
+		  return 'loaded dependency';
+		});
+	
+		librarySystem('app', ['dependency'], function(dependency) {
+		 return 'app with ' + dependency;
+		});
+	
+		var result = librarySystem('app');
+	
+		eq(result,'app with loaded dependency');
+  },
+  
+  'Library system should work when dependencies are not loaded in order: ':function(){
+    
+		librarySystem('workBlurb', ['name', 'company'], function(name, company) {
+		  return name + ' works at ' + company;
+		});
+	
+		librarySystem('name', [], function() {
+		  return 'Gordon';
+		});
+	
+		librarySystem('company', [], function() {
+		  return 'Watch and Code';
+		});
+	
+		var result = librarySystem('workBlurb');
+	
+		eq(result,'Gordon works at Watch and Code');
+  },
+  
+  'Callback function should only run once even if a specific library is called multiple times: ': function(){
+  		var counter = 1;
+		librarySystem('incrementCounter', [], function() {
+		  counter++;
+		  return counter;
+		});
+	    
+	    //the variable counter should increment only once when called the first time
+  		var result = librarySystem('incrementCounter');
+	    
+	    //Any subsequent calls thereafter it should return the same value from librarySystem['incrementCounter']
+	    result = librarySystem('incrementCounter');
+	    result = librarySystem('incrementCounter');
+	    result = librarySystem('incrementCounter');
+	    eq(counter,2);
+  }
+});  
+
+</script>
